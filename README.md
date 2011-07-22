@@ -3,17 +3,7 @@ Asynchronous flow-control (serial, parallel, repeat, wait, function) module for 
 
 ## Installation
 
-### Node.js
-    $ npm install Flow
-
-### RequireJS
-    <script src="path/to/require.js"></script>
-    <script>
-      var Flow = require('net.minodisk.core.Flow');
-    </script>
-
-### Browser
-    <script src="path/to/flow.js></script>
+    $ npm install nestableflow
 
 ## Inspired
 * [東京Node学園#1「非同期プログラミングの改善」のエッセンス](http://www.slideshare.net/koichik/node1)
@@ -153,7 +143,7 @@ Set callback `flow.next`.
 [file.js](https://github.com/minodisk/flow.js/blob/master/example/file.js)
 
     var fs = require('fs');
-    var Flow = require('Flow').Flow;
+    var Flow = require('nestableflow').Flow;
     var now = (new Date()).toString();
 
     // Callback style
@@ -202,7 +192,7 @@ Set callback `flow.next`.
 [mongoose.js](https://github.com/minodisk/flow-js/blob/master/example/mongoose.js)
 
     var mongoose = require('mongoose');
-    var Flow = require('Flow').Flow;
+    var Flow = require('nestableflow').Flow;
     var now = new Date();
 
     mongoose.connect('mongodb://localhost/node_flow');
