@@ -20,9 +20,9 @@ Asynchronous flow-control (serial, parallel, repeat, wait, function) module for 
 ## API Documentation
 
 ### Class Methods
-* **serial(actor, \[actor, ...\])** - \[static\] Create serial flow with arguments of actor. (suger)
+* **serial(actor\[, actor, ...\])** - \[static\] Create serial flow with arguments of actor. (suger)
 * **serialActors(actors)** - \[static\] Create serial flow with array of actor.
-* **parallel(actor, \[actor, ...\])** - \[static\] Create parallel flow with arguments of actor. (suger)
+* **parallel(actor\[, actor, ...\])** - \[static\] Create parallel flow with arguments of actor. (suger)
 * **parallelActors(actors)** - \[static\] Create parallel flow with array of actor.
 * **repeat(actor, repeatCount)** - \[static\] Repeat actor.
 * **wait(delay)** - \[static\] Create an actor that contains timer.
