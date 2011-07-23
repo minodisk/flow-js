@@ -136,18 +136,18 @@
       function (flow) {
         test.strictEqual(flow.currentPhase, 0);
         test.strictEqual(flow.totalPhase, 3);
-        fs.writeFile('tmp/serial_file.txt', now, flow.next);
+        fs.writeFile('serial_file.txt', now, flow.next);
       },
       function (flow) {
         test.strictEqual(flow.currentPhase, 1);
         test.strictEqual(flow.totalPhase, 3);
-        fs.readFile('tmp/serial_file.txt', 'utf8', flow.next);
+        fs.readFile('serial_file.txt', 'utf8', flow.next);
       },
       function (flow, data) {
         test.strictEqual(flow.currentPhase, 2);
         test.strictEqual(flow.totalPhase, 3);
         test.strictEqual(data, now);
-        fs.unlink('tmp/serial_file.txt', flow.next);
+        fs.unlink('serial_file.txt', flow.next);
       }
     );
     root.onError = function (err) {
@@ -377,16 +377,16 @@
       function (flow) {
         test.strictEqual(flow.currentPhase, 0);
         test.strictEqual(flow.totalPhase, 3);
-        fs.writeFile('tmp/serial_file.txt', now, flow.next);
+        fs.writeFile('serial_file.txt', now, flow.next);
       },
       function (flow) {
         test.strictEqual(flow.currentPhase, 1);
         test.strictEqual(flow.totalPhase, 3);
-        fs.readFile('tmp/serial_file.txt', 'utf8', flow.next);
+        fs.readFile('serial_file.txt', 'utf8', flow.next);
       },
       Flow.repeat(
         function (flow, data) {
-          fs.unlink('tmp/serial_file.txt', flow.next);
+          fs.unlink('serial_file.txt', flow.next);
         }, 10
       )
     );
@@ -445,19 +445,19 @@
     var root = Flow.repeat(
       function (flow) {
         test.strictEqual(flow.currentPhase, counter);
-        test.strictEqual(flow.totalPhase, 10);
+        test.strictEqual(flow.totalPhase, 3);
         test.strictEqual(counter, flow.currentPhase);
         counter++;
         flow.next();
-      }, 10
+      }, 3
     );
     root.onError = function (err) {
       console.log('Error!!', err);
     };
     root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 10);
-      test.strictEqual(root.totalPhase, 10);
-      test.strictEqual(counter, 10);
+      test.strictEqual(root.currentPhase, 3);
+      test.strictEqual(root.totalPhase, 3);
+      test.strictEqual(counter, 3);
       test.done();
     };
     root.start();
@@ -502,16 +502,16 @@
             flow.next();
           }, 200);
         }
-      ), 10
+      ), 3
     );
     root.onError = function (err) {
       console.log('Error!!', err);
     };
     root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 10);
-      test.strictEqual(root.totalPhase, 10);
-      test.strictEqual(counter, 30);
-      test.strictEqual(_getTime(from), 6000);
+      test.strictEqual(root.currentPhase, 3);
+      test.strictEqual(root.totalPhase, 3);
+      test.strictEqual(counter, 9);
+      test.strictEqual(_getTime(from), 1800);
       test.done();
     };
     root.start();
@@ -556,16 +556,16 @@
             flow.next();
           }, 200);
         }
-      ), 10
+      ), 3
     );
     root.onError = function (err) {
       console.log('Error!!', err);
     };
     root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 10);
-      test.strictEqual(root.totalPhase, 10);
-      test.strictEqual(counter, 30);
-      test.strictEqual(_getTime(from), 3000);
+      test.strictEqual(root.currentPhase, 3);
+      test.strictEqual(root.totalPhase, 3);
+      test.strictEqual(counter, 9);
+      test.strictEqual(_getTime(from), 900);
       test.done();
     };
     root.start();
@@ -579,12 +579,12 @@
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 2);
-          fs.writeFile('tmp/mixed_0.txt', 'foo ' + now, flow.next);
+          fs.writeFile('mixed_0.txt', 'foo ' + now, flow.next);
         },
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 2);
-          fs.writeFile('tmp/mixed_1.txt', 'bar ' + now, flow.next);
+          fs.writeFile('mixed_1.txt', 'bar ' + now, flow.next);
         }
       ),
       function (flow) {
@@ -597,7 +597,7 @@
           function (flow) {
             test.strictEqual(flow.currentPhase, 0);
             test.strictEqual(flow.totalPhase, 2);
-            fs.readFile('tmp/mixed_0.txt', 'utf8', flow.next);
+            fs.readFile('mixed_0.txt', 'utf8', flow.next);
           },
           function (flow, data) {
             test.strictEqual(flow.currentPhase, 1);
@@ -610,7 +610,7 @@
           function (flow) {
             test.strictEqual(flow.currentPhase, 0);
             test.strictEqual(flow.totalPhase, 2);
-            fs.readFile('tmp/mixed_1.txt', 'utf8', flow.next);
+            fs.readFile('mixed_1.txt', 'utf8', flow.next);
           },
           function (flow, data) {
             test.strictEqual(flow.currentPhase, 1);
@@ -629,12 +629,12 @@
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 2);
-          fs.unlink('tmp/mixed_0.txt', flow.next);
+          fs.unlink('mixed_0.txt', flow.next);
         },
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 2);
-          fs.unlink('tmp/mixed_1.txt', flow.next);
+          fs.unlink('mixed_1.txt', flow.next);
         }
       ),
       function (flow) {
@@ -657,9 +657,8 @@
   };
 
   function _getTime(from) {
-    return Math.round(((new Date()).getTime() - from.getTime()) / 100) * 100;
+    return Math.floor(((new Date()).getTime() - from.getTime()) / 100) * 100;
   }
 
   module.exports = nodeunit.testCase(_case);
-
 })();
