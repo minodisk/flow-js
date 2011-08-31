@@ -1,536 +1,379 @@
 (function () {
   var nodeunit = require('nodeunit');
   var fs = require('fs');
+  var http = require('http');
   var Flow = require('../lib/flow.js').Flow;
 
-  var _case = {};
+  exports.serial = {
 
-  _case.setUp = function (next) {
-    next();
-  };
-
-  _case['serial'] = function (test) {
-    var root = Flow.serial(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        flow.next();
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 3);
-        flow.next();
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 2);
-        test.strictEqual(flow.totalPhase, 3);
-        flow.next();
-      }
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.done();
-    };
-    root.start();
-  };
-
-  _case['serial timer'] = function (test) {
-    var from = new Date();
-    var root = Flow.serial(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), 300);
+    count: function (test) {
+      var count = 0;
+      var root = Flow.serial(
+        function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 3);
+          test.strictEqual(count++, 0);
           flow.next();
-        }, 300);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), 400);
+        },
+        function (flow) {
           test.strictEqual(flow.currentPhase, 1);
           test.strictEqual(flow.totalPhase, 3);
+          test.strictEqual(count++, 1);
           flow.next();
-        }, 100);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 2);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), 600);
+        },
+        function (flow) {
           test.strictEqual(flow.currentPhase, 2);
           test.strictEqual(flow.totalPhase, 3);
+          test.strictEqual(count++, 2);
           flow.next();
-        }, 200);
-      }
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.done();
-    };
-    root.start();
-  };
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.strictEqual(count, 3);
+        test.done();
+      };
+      root.start();
+    },
 
-  _case['serialActors'] = function (test) {
-    var counter = 0;
-    var from = new Date();
-    var timer300 = function (flow) {
-      test.strictEqual(flow.currentPhase, (counter === 0) ? 0 : 3);
-      test.strictEqual(flow.totalPhase, 4);
-      setTimeout(function () {
-        test.strictEqual(_getTime(from), (counter === 0) ? 300 : 900);
-        test.strictEqual(flow.currentPhase, (counter === 0) ? 0 : 3);
-        test.strictEqual(flow.totalPhase, 4);
-        counter++;
-        flow.next();
-      }, 300);
-    };
-    var timer100 = function (flow) {
-      test.strictEqual(flow.currentPhase, 1);
-      test.strictEqual(flow.totalPhase, 4);
-      setTimeout(function () {
-        test.strictEqual(_getTime(from), 400);
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 4);
-        flow.next();
-      }, 100);
-    };
-    var timer200 = function (flow) {
-      test.strictEqual(flow.currentPhase, 2);
-      test.strictEqual(flow.totalPhase, 4);
-      setTimeout(function () {
-        test.strictEqual(_getTime(from), 600);
-        test.strictEqual(flow.currentPhase, 2);
-        test.strictEqual(flow.totalPhase, 4);
-        flow.next();
-      }, 200);
-    };
-    var actors = [timer300, timer100, timer200, timer300];
-    var root = Flow.serialActors(actors);
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 4);
-      test.strictEqual(root.totalPhase, 4);
-      test.done();
-    };
-    root.start();
-  };
-
-  _case['serial file'] = function (test) {
-    var now = (new Date()).toString();
-    var root = Flow.serial(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        fs.writeFile('serial_file.txt', now, flow.next);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 3);
-        fs.readFile('serial_file.txt', 'utf8', flow.next);
-      },
-      function (flow, data) {
-        test.strictEqual(flow.currentPhase, 2);
-        test.strictEqual(flow.totalPhase, 3);
-        test.strictEqual(data, now);
-        fs.unlink('serial_file.txt', flow.next);
-      }
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.done();
-    };
-    root.start();
-  };
-
-  _case['parallel'] = function (test) {
-    var root = Flow.parallel(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        flow.next();
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        flow.next();
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        flow.next();
-      }
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.done();
-    };
-    root.start();
-  };
-
-  _case['parallel timer'] = function (test) {
-    var from = new Date();
-    var root = Flow.parallel(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), 300);
-          test.strictEqual(flow.currentPhase, 2);
-          test.strictEqual(flow.totalPhase, 3);
-          flow.next();
-        }, 300);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), 100);
-          test.strictEqual(flow.currentPhase, 0);
-          test.strictEqual(flow.totalPhase, 3);
-          flow.next();
-        }, 100);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), 200);
-          test.strictEqual(flow.currentPhase, 1);
-          test.strictEqual(flow.totalPhase, 3);
-          flow.next();
-        }, 200);
-      }
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.done();
-    };
-    root.start();
-  };
-
-  _case['parallelActors'] = function (test) {
-    var from = new Date();
-    var timer300 = function (flow) {
-      test.strictEqual(flow.currentPhase, 0);
-      test.strictEqual(flow.totalPhase, 4);
-      setTimeout(function () {
-        test.strictEqual(_getTime(from), 300);
-        test.strictEqual(flow.currentPhase, 2);
-        test.strictEqual(flow.totalPhase, 4);
-        flow.next();
-      }, 300);
-    };
-    var timer100 = function (flow) {
-      test.strictEqual(flow.currentPhase, 0);
-      test.strictEqual(flow.totalPhase, 4);
-      setTimeout(function () {
-        test.strictEqual(_getTime(from), 100);
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 4);
-        flow.next();
-      }, 100);
-    };
-    var timer200 = function (flow) {
-      test.strictEqual(flow.currentPhase, 0);
-      test.strictEqual(flow.totalPhase, 4);
-      setTimeout(function () {
-        test.strictEqual(_getTime(from), 200);
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 4);
-        flow.next();
-      }, 200);
-    };
-    var actors = [timer300, timer100, timer200, timer300];
-    var root = Flow.parallelActors(actors);
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 4);
-      test.strictEqual(root.totalPhase, 4);
-      test.done();
-    };
-    root.start();
-  };
-
-  _case['stop'] = function (test) {
-    var from = new Date();
-    var root = Flow.serial(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 2);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), 100);
-          test.strictEqual(flow.currentPhase, 0);
-          test.strictEqual(flow.totalPhase, 2);
-          flow.next();
-        }, 100);
-      },
-      Flow.repeat(
+    timer: function (test) {
+      var from = new Date();
+      var root = Flow.serial(
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 3);
           setTimeout(function () {
-            test.strictEqual(_getTime(from), 400);
             test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            flow.next();
+          }, 100);
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 1);
+          test.strictEqual(flow.totalPhase, 3);
+          setTimeout(function () {
+            test.strictEqual(flow.currentPhase, 1);
             test.strictEqual(flow.totalPhase, 3);
             flow.next();
           }, 300);
         },
-        3
-      )
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 1);
-      test.strictEqual(root.totalPhase, 2);
-      test.done();
-    };
-    root.start();
-    setTimeout(root.stop, 300);
-  };
-
-  _case['reset'] = function (test) {
-    var counter = 0;
-    var from = new Date();
-    var root = Flow.serial(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), (counter === 0) ? 300 : 700);
-          test.strictEqual(flow.currentPhase, 0);
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 2);
           test.strictEqual(flow.totalPhase, 3);
-          flow.next();
-        }, 300);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 3);
-        setTimeout(function () {
-          test.strictEqual(_getTime(from), (counter === 0) ? 400 : 800);
-          test.strictEqual(flow.currentPhase, 1);
-          test.strictEqual(flow.totalPhase, 3);
-          flow.next();
-        }, 100);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 2);
-        test.strictEqual(flow.totalPhase, 3);
-        if (counter === 0) {
-          counter++;
-          root.reset();
-          root.start();
-        } else {
           setTimeout(function () {
-            test.strictEqual(_getTime(from), 1000);
             test.strictEqual(flow.currentPhase, 2);
             test.strictEqual(flow.totalPhase, 3);
             flow.next();
-          }, 200);
+          }, 500);
         }
-      }
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.done();
-    };
-    root.start();
-  };
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        var time = _getTime(from);
+        test.ok(time >= 900 && time < 1000, time);
+        test.done();
+      };
+      root.start();
+    },
 
-  _case['error'] = function (test) {
-    var now = (new Date()).toString();
-    var root = Flow.serial(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 0);
-        test.strictEqual(flow.totalPhase, 3);
-        fs.writeFile('serial_file.txt', now, flow.next);
-      },
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 3);
-        fs.readFile('serial_file.txt', 'utf8', flow.next);
-      },
-      Flow.repeat(
+    file: function (test) {
+      var now = (new Date()).toString();
+      var root = Flow.serial(
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          fs.writeFile('serial.txt', now, flow.next);
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 1);
+          test.strictEqual(flow.totalPhase, 3);
+          fs.readFile('serial.txt', 'utf8', flow.next);
+        },
         function (flow, data) {
-          fs.unlink('serial_file.txt', flow.next);
-        }, 10
-      )
-    );
-    root.onError = function (err) {
-      test.strictEqual(err.code, 'ENOENT');
-      test.done();
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.done();
-    };
-    root.start();
+          test.strictEqual(flow.currentPhase, 2);
+          test.strictEqual(flow.totalPhase, 3);
+          test.strictEqual(data, now);
+          fs.unlink('serial.txt', flow.next);
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.done();
+      };
+      root.start();
+    },
+
+    http: function (test) {
+      var host = 'static.minodisk.net';
+      var paths = ['/texts/0.txt', '/texts/1.txt', '/texts/2.txt'];
+      var texts = ['zero', 'one', 'two'];
+      var root = Flow.serial(
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 6);
+          http.get({
+            host: host,
+            port: 80,
+            path: paths[0]
+          }, flow.next);
+        },
+        function (flow, res) {
+          test.strictEqual(flow.currentPhase, 1);
+          test.strictEqual(flow.totalPhase, 6);
+          var data = '';
+          res.setEncoding('utf8');
+          res.on('data', function (chunk) {
+            data += chunk;
+          });
+          res.on('end', function () {
+            test.strictEqual(data, texts[0]);
+            flow.next();
+          });
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 2);
+          test.strictEqual(flow.totalPhase, 6);
+          http.get({
+            host: host,
+            port: 80,
+            path: paths[1]
+          }, flow.next);
+        },
+        function (flow, res) {
+          test.strictEqual(flow.currentPhase, 3);
+          test.strictEqual(flow.totalPhase, 6);
+          var data = '';
+          res.setEncoding('utf8');
+          res.on('data', function (chunk) {
+            data += chunk;
+          });
+          res.on('end', function () {
+            test.strictEqual(data, texts[1]);
+            flow.next();
+          });
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 4);
+          test.strictEqual(flow.totalPhase, 6);
+          http.get({
+            host: host,
+            port: 80,
+            path: paths[2]
+          }, flow.next);
+        },
+        function (flow, res) {
+          test.strictEqual(flow.currentPhase, 5);
+          test.strictEqual(flow.totalPhase, 6);
+          var data = '';
+          res.setEncoding('utf8');
+          res.on('data', function (chunk) {
+            data += chunk;
+          });
+          res.on('end', function () {
+            test.strictEqual(data, texts[2]);
+            flow.next();
+          });
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 6);
+        test.strictEqual(root.totalPhase, 6);
+        test.done();
+      };
+      root.start();
+    }
+
   };
 
-  _case['wait'] = function (test) {
-    var from = new Date();
-    var root = Flow.serial(
-      Flow.wait(300),
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 1);
-        test.strictEqual(flow.totalPhase, 7);
-        test.strictEqual(_getTime(from), 300);
-        flow.next();
-      },
-      Flow.wait(100),
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 3);
-        test.strictEqual(flow.totalPhase, 7);
-        test.strictEqual(_getTime(from), 400);
-        flow.next();
-      },
-      Flow.wait(200),
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 5);
-        test.strictEqual(flow.totalPhase, 7);
-        test.strictEqual(_getTime(from), 600);
-        flow.next();
-      },
-      Flow.wait(400)
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 7);
-      test.strictEqual(root.totalPhase, 7);
-      test.strictEqual(_getTime(from), 1000);
-      test.done();
-    };
-    root.start();
-  };
+  exports.serialActors = {
 
-  _case['repeat function'] = function (test) {
-    var counter = 0;
-    var root = Flow.repeat(
-      function (flow) {
-        test.strictEqual(flow.currentPhase, counter);
-        test.strictEqual(flow.totalPhase, 3);
-        test.strictEqual(counter, flow.currentPhase);
-        counter++;
-        flow.next();
-      }, 3
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.strictEqual(counter, 3);
-      test.done();
-    };
-    root.start();
-  };
+    count: function (test) {
+      var count = 0;
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, i);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(count++, i);
+            flow.next();
+          };
+        })(i);
+      }
+      var root = Flow.serialActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.strictEqual(count, 3);
+        test.done();
+      };
+      root.start();
+    },
 
-  _case['repeat serial timer'] = function (test) {
-    var counter = 0;
-    var from = new Date();
-    var root = Flow.repeat(
-      Flow.serial(
+    timer: function (test) {
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, i);
+            test.strictEqual(flow.totalPhase, 3);
+            setTimeout(function () {
+              test.strictEqual(flow.currentPhase, i);
+              test.strictEqual(flow.totalPhase, 3);
+              flow.next();
+            }, 100);
+          };
+        })(i);
+      }
+      var root = Flow.serialActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.done();
+      };
+      root.start();
+    },
+
+    file: function (test) {
+      var now = (new Date()).toString();
+      var actors = [
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 3);
-          setTimeout(function () {
-            test.strictEqual(flow.currentPhase, 0);
-            test.strictEqual(flow.totalPhase, 3);
-            test.strictEqual(counter, 3 * root.currentPhase + flow.currentPhase);
-            counter++;
-            flow.next();
-          }, 300);
+          fs.writeFile('serialActors.txt', now, flow.next);
         },
         function (flow) {
           test.strictEqual(flow.currentPhase, 1);
           test.strictEqual(flow.totalPhase, 3);
-          setTimeout(function () {
-            test.strictEqual(flow.currentPhase, 1);
-            test.strictEqual(flow.totalPhase, 3);
-            test.strictEqual(counter, 3 * root.currentPhase + flow.currentPhase);
-            counter++;
-            flow.next();
-          }, 100);
+          fs.readFile('serialActors.txt', 'utf8', flow.next);
         },
-        function (flow) {
+        function (flow, data) {
           test.strictEqual(flow.currentPhase, 2);
           test.strictEqual(flow.totalPhase, 3);
-          setTimeout(function () {
-            test.strictEqual(flow.currentPhase, 2);
-            test.strictEqual(flow.totalPhase, 3);
-            test.strictEqual(counter, 3 * root.currentPhase + flow.currentPhase);
-            test.strictEqual(_getTime(from), 600 * (root.currentPhase + 1));
-            counter++;
-            flow.next();
-          }, 200);
+          test.strictEqual(data, now);
+          fs.unlink('serialActors.txt', flow.next);
         }
-      ), 3
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.strictEqual(counter, 9);
-      test.strictEqual(_getTime(from), 1800);
-      test.done();
-    };
-    root.start();
+      ];
+      var root = Flow.serialActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.done();
+      };
+      root.start();
+    },
+
+    http: function (test) {
+      var host = 'static.minodisk.net';
+      var paths = ['/texts/0.txt', '/texts/1.txt', '/texts/2.txt'];
+      var texts = ['zero', 'one', 'two'];
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors.push(
+          (function (i) {
+            return function (flow) {
+              test.strictEqual(flow.currentPhase, i * 2);
+              test.strictEqual(flow.totalPhase, 6);
+              http.get({
+                host: host,
+                port: 80,
+                path: paths[i]
+              }, flow.next);
+            };
+          })(i),
+          (function (i) {
+            return function (flow, res) {
+              test.strictEqual(flow.currentPhase, i * 2 + 1);
+              test.strictEqual(flow.totalPhase, 6);
+              var data = '';
+              res.setEncoding('utf8');
+              res.on('data', function (chunk) {
+                data += chunk;
+              });
+              res.on('end', function () {
+                test.strictEqual(data, texts[i]);
+                flow.next();
+              });
+            };
+          })(i)
+        );
+      }
+      var root = Flow.serialActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 6);
+        test.strictEqual(root.totalPhase, 6);
+        test.done();
+      };
+      root.start();
+    }
+
   };
 
-  _case['repeat parallel timer'] = function (test) {
-    var counter = 0;
-    var from = new Date();
-    var root = Flow.repeat(
-      Flow.parallel(
+  exports.parallel = {
+
+    count: function (test) {
+      var count = 0;
+      var counts = [0, 1, 2];
+      var root = Flow.parallel(
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          test.strictEqual(count++, counts.shift());
+          flow.next();
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          test.strictEqual(count++, counts.shift());
+          flow.next();
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          test.strictEqual(count++, counts.shift());
+          flow.next();
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.strictEqual(count, 3);
+        test.strictEqual(counts.length, 0);
+        test.done();
+      };
+      root.start();
+    },
+
+    timer: function (test) {
+      var from = new Date();
+      var root = Flow.parallel(
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 3);
           setTimeout(function () {
-            test.strictEqual(flow.currentPhase, 2);
+            test.strictEqual(flow.currentPhase, 0);
             test.strictEqual(flow.totalPhase, 3);
-            test.strictEqual(counter, 3 * root.currentPhase + flow.currentPhase);
-            test.strictEqual(_getTime(from), 300 * (root.currentPhase + 1));
-            counter++;
+            flow.next();
+          }, 100);
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          setTimeout(function () {
+            test.strictEqual(flow.currentPhase, 1);
+            test.strictEqual(flow.totalPhase, 3);
             flow.next();
           }, 300);
         },
@@ -538,127 +381,919 @@
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 3);
           setTimeout(function () {
-            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.currentPhase, 2);
             test.strictEqual(flow.totalPhase, 3);
-            test.strictEqual(counter, 3 * root.currentPhase + flow.currentPhase);
-            counter++;
             flow.next();
-          }, 100);
+          }, 500);
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        var time = _getTime(from);
+        test.ok(time >= 500 && time < 600, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    file: function (test) {
+      var paths = ['parallel_0.txt', 'parallel_1.txt', 'parallel_2.txt'];
+      var texts = ['zero', 'one', 'two'];
+      var root = Flow.parallel(
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          fs.writeFile(paths[0], texts[0], flow.next);
         },
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
           test.strictEqual(flow.totalPhase, 3);
-          setTimeout(function () {
-            test.strictEqual(flow.currentPhase, 1);
-            test.strictEqual(flow.totalPhase, 3);
-            test.strictEqual(counter, 3 * root.currentPhase + flow.currentPhase);
-            counter++;
-            flow.next();
-          }, 200);
+          fs.writeFile(paths[1], texts[1], flow.next);
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          fs.writeFile(paths[2], texts[2], flow.next);
         }
-      ), 3
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 3);
-      test.strictEqual(root.totalPhase, 3);
-      test.strictEqual(counter, 9);
-      test.strictEqual(_getTime(from), 900);
-      test.done();
-    };
-    root.start();
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        for (var i = 0; i < 3; ++i) {
+          test.strictEqual(fs.readFileSync(paths[i], 'utf8'), texts[i]);
+          fs.unlinkSync(paths[i]);
+        }
+        test.done();
+      };
+      root.start();
+    },
+
+    http: function (test) {
+      var host = 'static.minodisk.net';
+      var paths = ['/texts/0.txt', '/texts/1.txt', '/texts/2.txt'];
+      var texts = ['zero', 'one', 'two'];
+      var phases = [0, 1, 2];
+      var root = Flow.parallel(
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          http.get({
+            host: host,
+            port: 80,
+            path: paths[0]
+          }, function (res) {
+            test.strictEqual(flow.currentPhase, phases.shift());
+            test.strictEqual(flow.totalPhase, 3);
+            var data = '';
+            res.setEncoding('utf8');
+            res.on('data', function (chunk) {
+              data += chunk;
+            });
+            res.on('end', function () {
+              test.strictEqual(data, texts[0]);
+              flow.next();
+            });
+          });
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          http.get({
+            host: host,
+            port: 80,
+            path: paths[1]
+          }, function (res) {
+            test.strictEqual(flow.currentPhase, phases.shift());
+            test.strictEqual(flow.totalPhase, 3);
+            var data = '';
+            res.setEncoding('utf8');
+            res.on('data', function (chunk) {
+              data += chunk;
+            });
+            res.on('end', function () {
+              test.strictEqual(data, texts[1]);
+              flow.next();
+            });
+          });
+        },
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 3);
+          http.get({
+            host: host,
+            port: 80,
+            path: paths[2]
+          }, function (res) {
+            test.strictEqual(flow.currentPhase, phases.shift());
+            test.strictEqual(flow.totalPhase, 3);
+            var data = '';
+            res.setEncoding('utf8');
+            res.on('data', function (chunk) {
+              data += chunk;
+            });
+            res.on('end', function () {
+              test.strictEqual(data, texts[2]);
+              flow.next();
+            });
+          });
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.strictEqual(phases.length, 0);
+        test.done();
+      };
+      root.start();
+    }
+
   };
 
-  _case['mixed file'] = function (test) {
-    var now = (new Date()).toString();
-    var root = Flow.serial(
-      Flow.wait(100),
-      Flow.parallel(
-        function (flow) {
-          test.strictEqual(flow.currentPhase, 0);
-          test.strictEqual(flow.totalPhase, 2);
-          fs.writeFile('mixed_0.txt', 'foo ' + now, flow.next);
-        },
-        function (flow) {
-          test.strictEqual(flow.currentPhase, 0);
-          test.strictEqual(flow.totalPhase, 2);
-          fs.writeFile('mixed_1.txt', 'bar ' + now, flow.next);
+  exports.parallelActors = {
+
+    count: function (test) {
+      var count = 0;
+      var counts = [0, 1, 2];
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(count++, counts.shift());
+            flow.next();
+          };
+        })(i);
+      }
+      root = Flow.parallelActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.strictEqual(count, 3);
+        test.strictEqual(counts.length, 0);
+        test.done();
+      };
+      root.start();
+    },
+
+    timer: function (test) {
+      var from = new Date();
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            setTimeout(function () {
+              test.strictEqual(flow.currentPhase, i);
+              test.strictEqual(flow.totalPhase, 3);
+              flow.next();
+            }, 100 + 200 * i);
+          };
+        })(i);
+      }
+      var root = Flow.parallelActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        var time = _getTime(from);
+        test.ok(time >= 500 && time < 600, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    file: function (test) {
+      var paths = ['parallelActors_0.txt', 'parallelActors_1.txt',
+        'parallelActors_2.txt'];
+      var texts = ['zero', 'one', 'two'];
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            fs.writeFile(paths[i], texts[i], flow.next);
+          };
+        })(i);
+      }
+      var root = Flow.parallelActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        for (var i = 0; i < 3; ++i) {
+          test.strictEqual(fs.readFileSync(paths[i], 'utf8'), texts[i]);
+          fs.unlinkSync(paths[i]);
         }
-      ),
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 2);
-        test.strictEqual(flow.totalPhase, 8);
-        flow.next();
-      },
-      Flow.parallel(
+        test.done();
+      };
+      root.start();
+    },
+
+    http: function (test) {
+      var host = 'static.minodisk.net';
+      var paths = ['/texts/0.txt', '/texts/1.txt', '/texts/2.txt'];
+      var texts = ['zero', 'one', 'two'];
+      var phases = [0, 1, 2];
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            http.get({
+              host: host,
+              port: 80,
+              path: paths[i]
+            }, function (res) {
+              test.strictEqual(flow.currentPhase, phases.shift());
+              test.strictEqual(flow.totalPhase, 3);
+              var data = '';
+              res.setEncoding('utf8');
+              res.on('data', function (chunk) {
+                data += chunk;
+              });
+              res.on('end', function () {
+                test.strictEqual(data, texts[i]);
+                flow.next();
+              });
+            });
+          };
+        })(i);
+      }
+      var root = Flow.parallelActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        test.strictEqual(phases.length, 0);
+        test.done();
+      };
+      root.start();
+    }
+
+  };
+
+  exports.repeat = {
+
+    'function': function (test) {
+      var count = 0;
+      var root = Flow.repeat(
+        function (flow) {
+          test.strictEqual(flow.currentPhase, count++);
+          test.strictEqual(flow.totalPhase, 5);
+          flow.next();
+        }, 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        test.strictEqual(count, 5);
+        test.done();
+      };
+      root.start();
+    },
+
+    serial: function (test) {
+      var count = 0;
+      var root = Flow.repeat(
         Flow.serial(
           function (flow) {
             test.strictEqual(flow.currentPhase, 0);
-            test.strictEqual(flow.totalPhase, 2);
-            fs.readFile('mixed_0.txt', 'utf8', flow.next);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(root.currentPhase, count++ / 3 >> 0);
+            test.strictEqual(root.totalPhase, 5);
+            flow.next();
           },
-          function (flow, data) {
+          function (flow) {
             test.strictEqual(flow.currentPhase, 1);
-            test.strictEqual(flow.totalPhase, 2);
-            test.strictEqual(data, 'foo ' + now);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(root.currentPhase, count++ / 3 >> 0);
+            test.strictEqual(root.totalPhase, 5);
+            flow.next();
+          },
+          function (flow) {
+            test.strictEqual(flow.currentPhase, 2);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(root.currentPhase, count++ / 3 >> 0);
+            test.strictEqual(root.totalPhase, 5);
             flow.next();
           }
-        ),
-        Flow.serial(
+        ), 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        test.strictEqual(count, 15);
+        test.done();
+      };
+      root.start();
+    },
+
+    serialActors: function (test) {
+      var count = 0;
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, i);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(root.currentPhase, count++ / 3 >> 0);
+            test.strictEqual(root.totalPhase, 5);
+            flow.next();
+          };
+        })(i);
+      }
+      var root = Flow.repeat(
+        Flow.serialActors(actors), 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        test.strictEqual(count, 15);
+        test.done();
+      };
+      root.start();
+    },
+
+    parallel: function (test) {
+      var count = 0;
+      var counts = [];
+      for (var i = 0; i < 15; ++i) {
+        counts[i] = i;
+      }
+      var root = Flow.repeat(
+        Flow.parallel(
           function (flow) {
             test.strictEqual(flow.currentPhase, 0);
-            test.strictEqual(flow.totalPhase, 2);
-            fs.readFile('mixed_1.txt', 'utf8', flow.next);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(count++, counts.shift());
+            flow.next();
           },
-          function (flow, data) {
-            test.strictEqual(flow.currentPhase, 1);
-            test.strictEqual(flow.totalPhase, 2);
-            test.strictEqual(data, 'bar ' + now);
+          function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(count++, counts.shift());
+            flow.next();
+          },
+          function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(count++, counts.shift());
             flow.next();
           }
-        )
-      ),
-      function (flow) {
-        test.strictEqual(flow.currentPhase, 4);
-        test.strictEqual(flow.totalPhase, 8);
+        ), 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        test.strictEqual(count, 15);
+        test.strictEqual(counts.length, 0);
+        test.done();
+      };
+      root.start();
+    },
+
+    parallelActors: function (test) {
+      var count = 0;
+      var counts = [];
+      for (var i = 0; i < 15; ++i) {
+        counts[i] = i;
+      }
+      var actors = [];
+      for (i = 0; i < 3; ++i) {
+        actors[i] = (function (i) {
+          return function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(count++, counts.shift());
+            flow.next();
+          };
+        })(i);
+      }
+      var root = Flow.repeat(
+        Flow.parallelActors(actors), 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        test.strictEqual(count, 15);
+        test.strictEqual(counts.length, 0);
+        test.done();
+      };
+      root.start();
+    },
+
+    repeat: function (test) {
+      var count = 0;
+      var root = Flow.repeat(
+        Flow.repeat(
+          function (flow) {
+            test.strictEqual(flow.currentPhase, count % 3);
+            test.strictEqual(flow.totalPhase, 3);
+            test.strictEqual(root.currentPhase, count++ / 3 >> 0);
+            test.strictEqual(root.totalPhase, 5);
+            flow.next();
+          }, 3
+        ), 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        test.strictEqual(count, 15);
+        test.done();
+      };
+      root.start();
+    },
+
+    wait: function (test) {
+      var count = 0;
+      var from = new Date();
+      var root = Flow.repeat(
+        Flow.serial(
+          Flow.wait(100),
+          function (flow) {
+            test.strictEqual(flow.currentPhase, 1);
+            test.strictEqual(flow.totalPhase, 2);
+            test.strictEqual(root.currentPhase, count++);
+            test.strictEqual(root.totalPhase, 5);
+            flow.next();
+          }
+        ), 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        test.strictEqual(count, 5);
+        var time = _getTime(from);
+        test.ok(time >= 500 && time < 600, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    deep: function (test) {
+      var count = 0;
+      var actor = function (flow) {
+        ++count;
         flow.next();
-      },
-      Flow.parallel(
+      };
+      for (var i = 0; i < 10; ++i) {
+        actor = Flow.serial(
+          actor,
+          function (flow) {
+            ++count;
+            flow.next();
+          }
+        );
+      }
+      var root = Flow.repeat(
+        actor, 3
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(count, 33);
+        test.done();
+      };
+      root.start();
+    }
+
+  };
+
+  exports.wait = {
+
+    serial: function (test) {
+      var from = new Date();
+      var root = Flow.serial(
+        Flow.wait(100),
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 1);
+          test.strictEqual(flow.totalPhase, 6);
+          var time = _getTime(from);
+          test.ok(time >= 100 && time < 200, time);
+          flow.next();
+        },
+        Flow.wait(300),
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 3);
+          test.strictEqual(flow.totalPhase, 6);
+          var time = _getTime(from);
+          test.ok(time >= 400 && time < 500, time);
+          flow.next();
+        },
+        Flow.wait(500),
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 5);
+          test.strictEqual(flow.totalPhase, 6);
+          var time = _getTime(from);
+          test.ok(time >= 900 && time < 1000, time);
+          flow.next();
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 6);
+        test.strictEqual(root.totalPhase, 6);
+        var time = _getTime(from);
+        test.ok(time >= 900 && time < 1000, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    serialActors: function (test) {
+      var from = new Date();
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors.push(
+          Flow.wait(100),
+          (function (i) {
+            return function (flow) {
+              test.strictEqual(flow.currentPhase, i * 2 + 1);
+              test.strictEqual(flow.totalPhase, 6);
+              var time = _getTime(from);
+              test.ok(time >= 100 * (i + 1) && time < 100 * (i + 2), time);
+              flow.next();
+            };
+          })(i)
+        );
+      }
+      var root = Flow.serialActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 6);
+        test.strictEqual(root.totalPhase, 6);
+        var time = _getTime(from);
+        test.ok(time >= 300 && time < 400, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    parallel: function (test) {
+      var from = new Date();
+      var root = Flow.parallel(
+        Flow.wait(100),
         function (flow) {
           test.strictEqual(flow.currentPhase, 0);
-          test.strictEqual(flow.totalPhase, 2);
-          fs.unlink('mixed_0.txt', flow.next);
+          test.strictEqual(flow.totalPhase, 6);
+          var time = _getTime(from);
+          test.ok(time >= 0 && time < 100, time);
+          flow.next();
+        },
+        Flow.wait(300),
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 6);
+          var time = _getTime(from);
+          test.ok(time >= 0 && time < 100, time);
+          flow.next();
+        },
+        Flow.wait(500),
+        function (flow) {
+          test.strictEqual(flow.currentPhase, 0);
+          test.strictEqual(flow.totalPhase, 6);
+          var time = _getTime(from);
+          test.ok(time >= 0 && time < 100, time);
+          flow.next();
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 6);
+        test.strictEqual(root.totalPhase, 6);
+        var time = _getTime(from);
+        test.ok(time >= 500 && time < 600, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    parallelActors: function (test) {
+      var from = new Date();
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors.push(
+          Flow.wait(100 * (i + 2)),
+          function (flow) {
+            test.strictEqual(flow.currentPhase, 0);
+            test.strictEqual(flow.totalPhase, 6);
+            var time = _getTime(from);
+            test.ok(time >= 0 && time < 100, time);
+            flow.next();
+          }
+        );
+      }
+      var root = Flow.parallelActors(actors);
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 6);
+        test.strictEqual(root.totalPhase, 6);
+        var time = _getTime(from);
+        test.ok(time >= 400 && time < 500, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    repeat: function (test) {
+      var from = new Date();
+      var root = Flow.repeat(
+        Flow.wait(100), 5
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 5);
+        test.strictEqual(root.totalPhase, 5);
+        var time = _getTime(from);
+        test.ok(time >= 500 && time < 600, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    wait: function (test) {
+      var from = new Date();
+      var root = Flow.serial(
+        Flow.wait(100),
+        Flow.wait(300),
+        Flow.wait(500)
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 3);
+        test.strictEqual(root.totalPhase, 3);
+        var time = _getTime(from);
+        test.ok(time >= 900 && time < 1000, time);
+        test.done();
+      };
+      root.start();
+    },
+
+    deep: function (test) {
+      var from = new Date();
+      var count = 0;
+      var actor = function (flow) {
+        ++count;
+        flow.next();
+      };
+      for (var i = 0; i < 10; ++i) {
+        actor = Flow.serial(
+          actor,
+          Flow.wait(100),
+          function (flow) {
+            ++count;
+            flow.next();
+          }
+        );
+      }
+      var root = actor;
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(count, 11);
+        var time = _getTime(from);
+        test.ok(time >= 1000 && time < 1100, time);
+        test.done();
+      };
+      root.start();
+    }
+
+  };
+
+  exports.stop = {
+
+    timer: function (test) {
+      var count = 0;
+      var root = Flow.serial(
+        Flow.wait(100),
+        function (flow) {
+          ++count;
+          flow.next();
+        },
+        Flow.wait(500),
+        function (flow) {
+          ++count;
+          flow.next();
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 4);
+        test.strictEqual(root.totalPhase, 4);
+        test.strictEqual(count, 12);
+        test.done();
+      };
+      root.start();
+
+      setTimeout(function () {
+        root.stop();
+        test.strictEqual(root.currentPhase, 2);
+        test.strictEqual(root.totalPhase, 4);
+        test.strictEqual(count, 1);
+        count += 10;
+        root.start();
+      }, 300);
+    },
+
+    deep: function (test) {
+      var count = 0;
+      var actor = function (flow) {
+        ++count;
+        flow.next();
+      };
+      for (var i = 0; i < 10; ++i) {
+        actor = Flow.serial(
+          actor,
+          Flow.wait(200),
+          function (flow) {
+            ++count;
+            flow.next();
+          }
+        );
+      }
+      var root = actor;
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(count, 21);
+        test.done();
+      };
+      root.start();
+
+      setTimeout(function () {
+        root.stop();
+        test.strictEqual(count, 2);
+        count += 10;
+        root.start();
+      }, 300);
+    }
+
+  };
+
+  exports.reset = {
+
+    timer: function (test) {
+      var count = 0;
+      var root = Flow.serial(
+        Flow.wait(100),
+        function (flow) {
+          ++count;
+          flow.next();
+        },
+        Flow.wait(500),
+        function (flow) {
+          ++count;
+          flow.next();
+        }
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(root.currentPhase, 4);
+        test.strictEqual(root.totalPhase, 4);
+        test.strictEqual(count, 13);
+        test.done();
+      };
+      root.start();
+
+      setTimeout(function () {
+        root.reset();
+        test.strictEqual(root.currentPhase, 0);
+        test.strictEqual(root.totalPhase, 4);
+        test.strictEqual(count, 1);
+        count += 10;
+        root.start();
+      }, 300);
+    },
+
+    deep: function (test) {
+      var count = 0;
+      var actor = function (flow) {
+        ++count;
+        flow.next();
+      };
+      for (var i = 0; i < 10; ++i) {
+        actor = Flow.serial(
+          actor,
+          Flow.wait(200),
+          function (flow) {
+            ++count;
+            flow.next();
+          }
+        );
+      }
+      var root = actor;
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(count, 13);
+        test.done();
+      };
+      root.start();
+
+      setTimeout(function () {
+        root.reset();
+        test.strictEqual(count, 2);
+        root.start();
+      }, 300);
+    }
+
+  };
+
+  exports.eventHandlers = {
+
+    onError: function (test) {
+      var root = Flow.repeat(
+        function (flow) {
+          test.strictEqual(root.currentPhase, 0);
+          test.strictEqual(root.totalPhase, 10);
+          fs.unlink('onError.txt', flow.next);
+        }, 10
+      );
+      root.onError = function (err) {
+        test.strictEqual(root.currentPhase, 1);
+        test.strictEqual(root.totalPhase, 10);
+        test.strictEqual(err.code, 'ENOENT');
+        test.done();
+      };
+      root.onComplete = function () {
+        test.ok(false, 'unexpected completion');
+        test.done();
+      };
+      root.start();
+    }
+
+  };
+
+  exports.complexNest = {
+
+    http2file: function (test) {
+      var host = 'static.minodisk.net';
+      var paths = ['/texts/0.txt', '/texts/1.txt', '/texts/2.txt'];
+      var texts = [];
+      var text;
+      var actors = [];
+      for (var i = 0; i < 3; ++i) {
+        actors.push(
+          (function (i) {
+            return Flow.serial(
+              function (flow) {
+                http.get({
+                  host: host,
+                  port: 80,
+                  path: paths[i]
+                }, flow.next)
+              },
+              function (flow, res) {
+                var data = '';
+                res.on('data', function (chunk) {
+                  data += chunk;
+                });
+                res.on('end', function () {
+                  texts[i] = data;
+                  flow.next();
+                });
+              }
+            )
+          })(i)
+        );
+      }
+      var root = Flow.serial(
+        Flow.parallelActors(actors),
+        function (flow) {
+          fs.writeFile('http2file.txt', texts.join(','), flow.next);
         },
         function (flow) {
-          test.strictEqual(flow.currentPhase, 0);
-          test.strictEqual(flow.totalPhase, 2);
-          fs.unlink('mixed_1.txt', flow.next);
+          fs.readFile('http2file.txt', 'utf8', flow.next);
+        },
+        function (flow, data) {
+          text = data;
+          fs.unlink('http2file.txt', flow.next);
         }
-      ),
-      function (flow) {
-        test.ok('Delete files complete.');
-        test.strictEqual(flow.currentPhase, 6);
-        test.strictEqual(flow.totalPhase, 8);
-        flow.next();
-      },
-      Flow.wait(100)
-    );
-    root.onError = function (err) {
-      console.log('Error!!', err);
-    };
-    root.onComplete = function () {
-      test.strictEqual(root.currentPhase, 8);
-      test.strictEqual(root.totalPhase, 8);
-      test.done();
-    };
-    root.start();
+      );
+      root.onError = console.log;
+      root.onComplete = function () {
+        test.strictEqual(text, 'zero,one,two');
+        test.done();
+      };
+      root.start();
+    }
+
   };
 
   function _getTime(from) {
-    return Math.floor(((new Date()).getTime() - from.getTime()) / 100) * 100;
+    return (new Date()).getTime() - from.getTime();
   }
 
-  module.exports = nodeunit.testCase(_case);
 })();
