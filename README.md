@@ -1,7 +1,7 @@
 # flow.js
 Asynchronous flow-control (serial, parallel, repeat, wait, function) module for Node.js, RequireJS, and browser.
 
-## Installation
+## Installation (Node.js)
 
     $ npm install nestableflow
 
@@ -248,6 +248,17 @@ Set callback `flow.next`.
       console.log('complete');
     };
     root.start();
+
+### RequierJS
+
+[How to load flow.js with RequierJS](https://github.com/minodisk/flow-js/blob/master/example/require)
+
+    <script type="text/javascript" src="require.js"></script>
+    <script type="text/javascript">
+      require(['../../lib/flow'], function (Flow) {
+        console.log(Flow);
+      });
+    </script>
 
 ## License
 
